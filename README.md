@@ -45,28 +45,75 @@ touching them. Delete them yourself when you want them gone.
 
 ## Running it
 
-**Prerequisites:** JDK 21 and a PostgreSQL server.
+**Prerequisites:** JDK 21. Maven is not needed — the wrapper downloads it on first run. PostgreSQL
+is the default database, but you can skip installing it — see
+[without PostgreSQL](#running-without-postgresql) below.
 
-1. Create the database (the default configuration expects a database named `postgres` on
-   `localhost:5432` with user `postgres`):
+### With PostgreSQL
 
+1. Check PostgreSQL is running. No database needs creating: the defaults point at the `postgres`
+   database that every PostgreSQL installation already has, on `localhost:5432` with user
+   `postgres`. Hibernate creates the tables itself on first start (`ddl-auto: update`).
+
+   If the `postgres` user's password is not `postgres`, set it before starting:
+
+   ```powershell
+   $env:DB_PASSWORD = "your-password"     # PowerShell
+   ```
    ```bash
-   createdb postgres
+   export DB_PASSWORD=your-password       # macOS / Linux
    ```
 
-   Hibernate creates the tables itself on first start (`ddl-auto: update`).
+2. Start the app **from the project folder**:
 
-2. Start the app:
-
-   ```bash
-   ./mvnw spring-boot:run        # macOS / Linux
-   mvnw.cmd spring-boot:run      # Windows
+   ```powershell
+   .\mvnw.cmd spring-boot:run             # Windows PowerShell — the .\ is required
    ```
+   ```bash
+   ./mvnw spring-boot:run                 # macOS / Linux
+   ```
+
+   First run takes a few minutes: the wrapper fetches Maven and then the dependencies.
 
 3. Open <http://localhost:8081/jira-frontend.html>, sign up, and log in.
 
 4. To pull in Canvas assignments: **Sync Canvas** → paste an access token
    (Canvas → Account → Settings → New Access Token) → **Save & Sync**.
+
+### Running without PostgreSQL
+
+There is an `h2` profile that runs the app on an embedded database instead. Nothing to install and
+nothing to configure — the database is a file under `data/`, so accounts and Canvas tokens still
+survive a restart:
+
+```powershell
+.\mvnw.cmd spring-boot:run "-Dspring-boot.run.profiles=h2"      # Windows
+```
+```bash
+./mvnw spring-boot:run -Dspring-boot.run.profiles=h2            # macOS / Linux
+```
+
+To avoid repeating the flag, set the profile once for the session:
+
+```powershell
+$env:SPRING_PROFILES_ACTIVE = "h2"
+```
+```bash
+export SPRING_PROFILES_ACTIVE=h2
+```
+
+Everything works the same. Delete the `data/` folder to start from an empty database. This is meant
+for trying the app out and for development — PostgreSQL is what it is otherwise built against.
+
+### If it will not start
+
+| What you see | What it means |
+|---|---|
+| `无法将"mvnw.cmd"项识别为...` / `mvnw.cmd is not recognized` | PowerShell does not run programs from the current folder unless you prefix them: use `.\mvnw.cmd`. Check you are in the folder that contains `pom.xml`. |
+| `Connection to localhost:5432 refused` | PostgreSQL is not running. Start the service (Windows: Services → `postgresql-x64-…`), or run on the `h2` profile instead. |
+| `password authentication failed for user "postgres"` | Set `DB_PASSWORD` as in step 1. |
+| `Web server failed to start. Port 8081 was already in use` | Something else has the port. Set `SERVER_PORT` to something free. |
+| `JAVA_HOME not found` | Install JDK 21 and point `JAVA_HOME` at it. |
 
 ### Configuration
 
@@ -87,17 +134,16 @@ their account.
 
 ## Tests
 
+```powershell
+.\mvnw.cmd test      # Windows
+```
 ```bash
-./mvnw test
+./mvnw test          # macOS / Linux
 ```
 
-Everything under `src/test/java` runs without a database or a network, except
-`JiraApplicationTests`, which boots the full Spring context and therefore needs PostgreSQL running.
-To skip it:
-
-```bash
-./mvnw test -Dtest='!JiraApplicationTests'
-```
+No database or network needed. The unit tests use mocks, and `JiraApplicationTests` — which boots
+the whole Spring context — runs against an in-memory H2 database configured in
+`src/test/resources/application.yml`.
 
 | Test | Covers |
 |---|---|

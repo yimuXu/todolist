@@ -1,0 +1,22 @@
+# Run the app on an embedded database, with no PostgreSQL installed:
+#
+#   .\mvnw.cmd spring-boot:run "-Dspring-boot.run.profiles=h2"     (Windows)
+#   ./mvnw spring-boot:run -Dspring-boot.run.profiles=h2           (macOS / Linux)
+#
+# Only the settings that differ from application.yml are listed; everything else — the server
+# port, the JWT settings, ddl-auto — is inherited from it.
+spring:
+  datasource:
+    # A file under ./data rather than an in-memory database, so accounts and Canvas tokens
+    # survive a restart the same way they do on PostgreSQL.
+    #
+    # NON_KEYWORDS is not optional: H2 2.x treats GROUPS as a reserved word (it is the SQL
+    # window-frame keyword), and the Group entity maps to a table called "groups". Without this
+    # the schema fails to build on startup. USER, VALUE and KEY are listed for the same reason,
+    # so a future entity does not hit the identical wall.
+    url: "jdbc:h2:file:./data/jira;NON_KEYWORDS=GROUPS,USER,VALUE,KEY"
+    username: sa
+    password: ""
+    driver-class-name: org.h2.Driver
+  jpa:
+    database: h2

@@ -10,6 +10,11 @@ src/main/resources/application-local.yml
 src/main/resources/application-local.properties
 .env
 
+### Local H2 database files (the "h2" profile) ###
+data/
+*.mv.db
+*.trace.db
+
 ### Build output ###
 target/
 !**/src/main/**/target/

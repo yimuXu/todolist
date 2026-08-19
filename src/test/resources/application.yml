@@ -1,0 +1,31 @@
+# Test configuration. This file shadows src/main/resources/application.yml during tests — the
+# test classpath comes first — so it has to carry everything the context needs, not just the
+# overrides.
+#
+# The point of it is that `mvnw test` works on a machine with no PostgreSQL installed:
+# JiraApplicationTests boots the whole Spring context, and without this it would fail trying to
+# reach localhost:5432.
+spring:
+  datasource:
+    # In-memory and thrown away afterwards; DB_CLOSE_DELAY=-1 keeps it alive for the whole JVM
+    # rather than closing it when the first connection is released.
+    # NON_KEYWORDS: H2 2.x reserves GROUPS, and the Group entity maps to a table of that name.
+    url: "jdbc:h2:mem:jira-test;DB_CLOSE_DELAY=-1;NON_KEYWORDS=GROUPS,USER,VALUE,KEY"
+    username: sa
+    password: ""
+    driver-class-name: org.h2.Driver
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    database: h2
+    show-sql: false
+
+server:
+  error:
+    include-message: always
+    include-exception: false
+    include-stacktrace: never
+
+jwt:
+  secret: test-only-secret-key-at-least-32-characters-long
+  expiration: 86400000

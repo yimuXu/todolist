@@ -47,6 +47,16 @@
 			<artifactId>postgresql</artifactId>
 			<scope>runtime</scope>
 		</dependency>
+		<!--
+		  Embedded database, used by the "h2" Spring profile and by the tests, so the app can be
+		  run and the test suite executed without a PostgreSQL server installed. PostgreSQL stays
+		  the default; nothing selects H2 unless the profile is switched on.
+		-->
+		<dependency>
+			<groupId>com.h2database</groupId>
+			<artifactId>h2</artifactId>
+			<scope>runtime</scope>
+		</dependency>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-data-jpa-test</artifactId>
