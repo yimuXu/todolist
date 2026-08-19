@@ -300,6 +300,9 @@
   let editingItemId  = null;
   let showingAddForm = {};
   let isGroupBoard   = false;  // true when board shows a group list
+  // Declared with the rest of the state, not further down the file: showApp() runs on page load
+  // and clears it, which would hit the temporal dead zone if the declaration came later.
+  let currentBoardName = '';
 
   if (token) showApp();
 
@@ -340,8 +343,39 @@
   function doLogout() {
     token = null; currentUser = null;
     localStorage.removeItem('tf_token'); localStorage.removeItem('tf_user');
+    clearSession();
     document.getElementById('app-screen').style.display = 'none';
     document.getElementById('auth-screen').style.display = 'flex';
+  }
+
+  /**
+   * Wipes everything belonging to the account that was signed in: the cached lists, groups and
+   * items, whatever the board was pointing at, and the rendered sidebar and board themselves.
+   *
+   * Without this, logging out only swapped the screens — the previous user's board stayed drawn
+   * underneath, so the next person to log in saw it until their own lists finished loading, or
+   * for good if they never clicked a list. currentListId also survived, which meant the next
+   * account's first reload asked for a list id that was not theirs.
+   */
+  function clearSession() {
+    lists = []; groups = []; items = [];
+    currentListId = null; currentGroupId = null; currentGroupListId = null;
+    editingItemId = null; showingAddForm = {}; isGroupBoard = false; currentBoardName = '';
+
+    document.getElementById('list-container').innerHTML = '';
+    document.getElementById('group-container').innerHTML = '';
+    document.getElementById('new-list-name').value = '';
+    document.getElementById('new-group-name').value = '';
+    document.getElementById('invite-bell').style.display = 'none';
+    renderEmptyBoard();
+    // A modal left open would otherwise reappear over the next account's board.
+    document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('open'));
+    // Do not leave the last person's credentials sitting in the login form.
+    ['login-user','login-pass','su-user','su-email','su-pass'].forEach(id => {
+      const field = document.getElementById(id);
+      if (field) field.value = '';
+    });
+    setMsg('');
   }
   function setMsg(msg, isErr=false) {
     const el = document.getElementById('auth-msg');
@@ -349,6 +383,9 @@
     el.className = 'auth-msg ' + (isErr ? 'err' : 'ok');
   }
   function showApp() {
+    // Also cleared on the way in, not just on logout: loadLists() and friends are asynchronous,
+    // so anything still on screen would be visible during the gap before the new data arrives.
+    clearSession();
     document.getElementById('auth-screen').style.display = 'none';
     document.getElementById('app-screen').style.display  = 'flex';
     document.getElementById('topbar-username').textContent = currentUser;
@@ -621,9 +658,6 @@
 
   function showAddForm(status) { showingAddForm[status]=true;  reRenderCurrentBoard(); }
   function hideAddForm(status) { showingAddForm[status]=false; reRenderCurrentBoard(); }
-
-  // Store current board name for re-renders
-  let currentBoardName = '';
 
   function reRenderCurrentBoard() {
     if (isGroupBoard) {
