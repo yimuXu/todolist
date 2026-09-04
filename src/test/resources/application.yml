@@ -29,3 +29,13 @@ server:
 jwt:
   secret: test-only-secret-key-at-least-32-characters-long
   expiration: 86400000
+
+spring.mail:
+  # Just enough for JavaMailSender autoconfiguration to produce a bean during context load —
+  # OtpService is wired into AuthController, so the context needs one even though no test
+  # actually sends an email. Not a real mailbox.
+  host: localhost
+  port: 3025
+
+mail:
+  from: test@example.com

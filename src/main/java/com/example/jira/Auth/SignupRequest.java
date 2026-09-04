@@ -1,23 +1,16 @@
 package com.example.jira.Auth;
 
 public class SignupRequest {
-    private String username;
     private String password;
     private String email;
+    private String code;
 
-    public SignupRequest(String username, String password, String email) {
-        this.username = username;
+    public SignupRequest(String password, String email) {
         this.password = password;
         this.email = email;
     }
 
-
-    public String getUsername() {
-        return username;
-    }
-
-    public void setUsername(String username) {
-        this.username = username;
+    public SignupRequest() {
     }
 
     public String getPassword() {
@@ -34,5 +27,13 @@ public class SignupRequest {
 
     public void setEmail(String email) {
         this.email = email;
+    }
+
+    public String getCode() {
+        return code;
+    }
+
+    public void setCode(String code) {
+        this.code = code;
     }
 }

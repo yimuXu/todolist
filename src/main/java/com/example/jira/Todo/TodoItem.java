@@ -81,6 +81,6 @@ public class TodoItem {
     public Long getCanvasAssignmentId() {return canvasAssignmentId;}
     public void setCanvasAssignmentId(Long canvasAssignmentId) {this.canvasAssignmentId = canvasAssignmentId;}
 
-    public String getAddedByUsername() {return addedby != null ? addedby.getUsername() : null;}
+    public String getAddedByUsername() {return addedby != null ? addedby.getEmail() : null;}
     public void setAddedBy(User addedby) {this.addedby = addedby;}
 }

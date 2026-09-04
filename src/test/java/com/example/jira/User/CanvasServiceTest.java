@@ -43,6 +43,7 @@ class CanvasServiceTest {
     private static final String CURRENT_TERM = AcademicTerm.current(LocalDate.now()).label();
 
     private final UserService userService = mock(UserService.class);
+    private final UserRepository userRepository = mock(UserRepository.class);
     private final TodoListRepository todoListRepository = mock(TodoListRepository.class);
     private final TodoItemRepository todoItemRepository = mock(TodoItemRepository.class);
 
@@ -54,9 +55,9 @@ class CanvasServiceTest {
     void setUp() {
         RestClient.Builder builder = RestClient.builder();
         canvas = MockRestServiceServer.bindTo(builder).build();
-        canvasService = new CanvasService(userService, todoListRepository, todoItemRepository, builder);
+        canvasService = new CanvasService(userService, userRepository, todoListRepository, todoItemRepository, builder);
 
-        user = new User("student", "pw", "student@example.com");
+        user = new User("student@example.com", "pw");
         user.setCanvasToken("canvas-token");
         user.setCanvasApiUrl(API);
         when(userService.getCurrentUser()).thenReturn(user);

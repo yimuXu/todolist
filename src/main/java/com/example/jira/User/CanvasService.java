@@ -7,6 +7,7 @@ import com.example.jira.Todo.TodoListRepository;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.ResourceAccessException;
@@ -25,6 +26,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Supplier;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -34,6 +37,7 @@ import java.util.regex.Pattern;
  */
 @Service
 public class CanvasService {
+    private static final Logger log = LoggerFactory.getLogger(CanvasService.class);
     static final String DEFAULT_CANVAS_API = "https://canvas.sydney.edu.au/api/v1";
     /** include[]=term is required for the current-semester check in CanvasCourse. */
     static final String COURSES_PATH = "/courses?enrollment_state=active&include[]=term&per_page=100";
@@ -47,13 +51,15 @@ public class CanvasService {
     private static final int MAX_REPORTED_SKIPS = 20;
 
     private final UserService userService;
+    private final UserRepository userRepository;
     private final TodoListRepository todoListRepository;
     private final TodoItemRepository todoItemRepository;
     private final RestClient restClient;
 
-    public CanvasService(UserService userService, TodoListRepository todoListRepository,
+    public CanvasService(UserService userService, UserRepository userRepository, TodoListRepository todoListRepository,
                          TodoItemRepository todoItemRepository, RestClient.Builder restClientBuilder) {
         this.userService = userService;
+        this.userRepository = userRepository;
         this.todoListRepository = todoListRepository;
         this.todoItemRepository = todoItemRepository;
         this.restClient = restClientBuilder.build();
@@ -90,7 +96,27 @@ public class CanvasService {
 
     @Transactional
     public CanvasSyncResponse syncAssignments() {
-        User user = userService.getCurrentUser();
+        return syncAssignments(userService.getCurrentUser());
+    }
+
+    /**
+     * Weekly, for every user who has a Canvas token saved — so assignments stay up to date
+     * even for users who never open the app to trigger a manual sync. One user's failure
+     * (revoked token, Canvas outage) must not stop the rest from syncing.
+     */
+    @Scheduled(cron = "0 0 6 * * MON")
+    @Transactional
+    public void syncAllUsersWeekly() {
+        for (User user : userRepository.findByCanvasTokenIsNotNull()) {
+            try {
+                syncAssignments(user);
+            } catch (Exception exception) {
+                log.warn("Weekly Canvas sync failed for user {}: {}", user.getEmail(), exception.getMessage());
+            }
+        }
+    }
+
+    private CanvasSyncResponse syncAssignments(User user) {
         String token = requireToken(user.getCanvasToken());
         String apiUrl = apiUrlOf(user);
 

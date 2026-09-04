@@ -15,47 +15,51 @@ public class TodoController {
     }
     // ----------------- todo list ---------------------------
     // get all of todo list
-    @GetMapping("/{username}")
+    @GetMapping("/{email}")
     public List<TodoList> getList(){
         return todoService.getList();
     }
-    @GetMapping("/{username}/{listid}")
+    @GetMapping("/{email}/{listid}")
     public TodoList getTodoList(@PathVariable int listid) {
         return todoService.getTodolist(listid);
     }
+    @GetMapping("/{email}/{listid}/sorted")
+    public List<TodoItem> getTodoListItemsSortedByDueDate(@PathVariable int listid) {
+        return todoService.getItemsSortedByDueDate(listid);
+    }
 
-    @PostMapping("/{username}/{listName}")
+    @PostMapping("/{email}/{listName}")
     public String createtodolist(@RequestBody TodoListRequest req) {
         todoService.createList(req);
         return "create todo list successfully";
     }
-    @PostMapping("/{username}/{listid}/update")
+    @PostMapping("/{email}/{listid}/update")
     public TodoList updateTodoList(@PathVariable int listid,@RequestBody TodoListRequest req) {
         return todoService.updateTodolist(listid,req);
     }
-    @DeleteMapping("/{username}/{listid}/delete")
+    @DeleteMapping("/{email}/{listid}/delete")
     public void deleteTodoList(@PathVariable int listid) {
         todoService.deleteList(listid);
     }
     //---------------todo item----------------------------------------
-    @PostMapping("/{username}/{listid}/add")
+    @PostMapping("/{email}/{listid}/add")
     public String addTodoItem(@PathVariable int listid,@RequestBody TodoItemRequest item) {
         todoService.addTodoItem(listid,item);
         return "add item successfully";
     }
-    @PostMapping("/{username}/{listid}/{itemid}/{status}")
+    @PostMapping("/{email}/{listid}/{itemid}/{status}")
     public String updateTodoItemStatus(@PathVariable int listid, @PathVariable int itemid, @PathVariable ItemStatus status) {
 
         todoService.markStatus(listid, itemid, status);
         return "update item successfully";
     }
-    @PostMapping("/{username}/{listid}/{itemid}")
+    @PostMapping("/{email}/{listid}/{itemid}")
     public String updateTodoItem(@PathVariable int listid,@PathVariable int itemid,@RequestBody TodoItemRequest req) {
 
         todoService.updateTodoItem(listid,itemid,req);
         return "update item successfully";
     }
-    @DeleteMapping("/{username}/{listid}/{itemid}")
+    @DeleteMapping("/{email}/{listid}/{itemid}")
     public String deleteTodoItem(@PathVariable int listid,@PathVariable int itemid) {
         todoService.deleteTodoItem(listid,itemid);
         return "delete item successfully";

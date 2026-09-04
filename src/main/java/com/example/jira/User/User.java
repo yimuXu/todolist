@@ -13,9 +13,8 @@ import java.util.*;
 @Table(name = "users")
 public class User implements UserDetails {
     @Id
-    private String username;
-    private String password;
     private String email;
+    private String password;
     private UserRole role;
     @JsonIgnore
     @Column(name = "canvas_token", nullable = true, length = 512)
@@ -32,10 +31,9 @@ public class User implements UserDetails {
 
 
 
-    public User(String username, String password, String email) {
-        this.username = username;
-        this.password = password;
+    public User(String email, String password) {
         this.email = email;
+        this.password = password;
         role = UserRole.General;
     }
 
@@ -50,13 +48,11 @@ public class User implements UserDetails {
     public Collection<? extends GrantedAuthority> getAuthorities() {
         return List.of(new SimpleGrantedAuthority("ROLE_USER"));
     }
+    // UserDetails.getUsername() is the interface's name for "the login identifier" — email now
+    // fills that role, so this returns email rather than a separate username field.
     @Override
     public String getUsername() {
-        return username;
-    }
-
-    public void setUserName(String userName) {
-        this.username = userName;
+        return email;
     }
     @Override
     @JsonIgnore
@@ -84,7 +80,6 @@ public class User implements UserDetails {
     public void setPassword(String password) {this.password = password;}
     public List<TodoList> getTodoLists() {return todoLists;}
     public String getEmail() {return email;}
-    public void setEmail(String email) {this.email = email;}
     public String getRole() {return role == null ? null : role.toString();}
     public void setRole(UserRole role) {this.role = role;}
     public String getCanvasToken() {return canvasToken;}

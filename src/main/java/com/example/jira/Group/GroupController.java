@@ -38,8 +38,8 @@ public class GroupController {
 
 
     @PostMapping("/{groupId}/invite")
-    public String inviteUserToGroup(@PathVariable int groupId, @RequestParam String username) {
-        return groupService.inviteUser(groupId, username);
+    public String inviteUserToGroup(@PathVariable int groupId, @RequestParam String email) {
+        return groupService.inviteUser(groupId, email);
     }
 
     @GetMapping("/invites/Sent")
@@ -95,7 +95,7 @@ public class GroupController {
     }
 
     @DeleteMapping("/{groupId}/deletemember")
-    public void deleteGroupMember(@PathVariable int groupId, @RequestParam String username) {
-        groupService.deleteGroupMember(groupId, username);
+    public void deleteGroupMember(@PathVariable int groupId, @RequestParam String email) {
+        groupService.deleteGroupMember(groupId, email);
     }
 }

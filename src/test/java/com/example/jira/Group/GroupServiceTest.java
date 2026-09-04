@@ -48,9 +48,9 @@ class GroupServiceTest {
     private final GroupService groupService = new GroupService(groupRepository, userService,
             groupInviteRepository, userRepository, todoListRepository, todoService, todoItemRepository);
 
-    private final User alice = new User("alice", "hashed", "alice@example.com");
-    private final User bob = new User("bob", "hashed", "bob@example.com");
-    private final User mallory = new User("mallory", "hashed", "mallory@example.com");
+    private final User alice = new User("alice@example.com", "hashed");
+    private final User bob = new User("bob@example.com", "hashed");
+    private final User mallory = new User("mallory@example.com", "hashed");
 
     private Group group;
     private TodoList sharedList;
@@ -161,10 +161,10 @@ class GroupServiceTest {
     @Test
     void invitingSomebodyTwiceDoesNotCreateASecondInvite() {
         when(userService.getCurrentUser()).thenReturn(alice);
-        when(userRepository.findByUsername("mallory")).thenReturn(Optional.of(mallory));
+        when(userRepository.findByEmail("mallory@example.com")).thenReturn(Optional.of(mallory));
         when(groupInviteRepository.existsByGroupAndInviteeAndStatus(group, mallory, InviteStatus.PENDING))
                 .thenReturn(true);
 
-        assertEquals("Please do not invite repeatedly.", groupService.inviteUser(3, "mallory"));
+        assertEquals("Please do not invite repeatedly.", groupService.inviteUser(3, "mallory@example.com"));
     }
 }

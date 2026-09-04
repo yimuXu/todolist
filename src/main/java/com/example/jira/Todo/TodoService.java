@@ -78,6 +78,12 @@ public class TodoService {
      * the list through the group instead of through list ownership, so it needs this entry point
      * rather than the listId one.
      */
+    // items in a list ordered by due date, earliest first; items with no due date sort last
+    public List<TodoItem> getItemsSortedByDueDate(int listId){
+        TodoList list = getTodolist(listId);
+        return todoItemRepository.findByTodoListOrderByDueDateAsc(list);
+    }
+
     public TodoItem getItemIn(TodoList list, int itemId){
         return todoItemRepository.findByIdAndTodoList(itemId, list)
                 .orElseThrow(()->new ResponseStatusException(HttpStatus.NOT_FOUND, "Task not found"));

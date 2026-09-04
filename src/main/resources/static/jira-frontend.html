@@ -167,17 +167,31 @@
     <div class="auth-tabs">
       <div class="auth-tab active" onclick="switchTab('login')">Login</div>
       <div class="auth-tab" onclick="switchTab('signup')">Sign Up</div>
+      <div class="auth-tab" onclick="switchTab('otp')">Code Login</div>
     </div>
     <div id="login-form">
-      <div class="field"><label>Username</label><input id="login-user" type="text" placeholder="your_username" onkeydown="if(event.key==='Enter')doLogin()" /></div>
+      <div class="field"><label>Email</label><input id="login-user" type="email" placeholder="you@example.com" onkeydown="if(event.key==='Enter')doLogin()" /></div>
       <div class="field"><label>Password</label><input id="login-pass" type="password" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()" /></div>
       <button class="btn" onclick="doLogin()">Login →</button>
+      <div style="text-align:center;margin-top:10px"><a href="#" style="font-size:12px;color:var(--text-muted)" onclick="switchTab('otp');return false">Login with an emailed code instead</a></div>
     </div>
     <div id="signup-form" style="display:none">
-      <div class="field"><label>Username</label><input id="su-user" type="text" placeholder="your_username" /></div>
-      <div class="field"><label>Email</label><input id="su-email" type="email" placeholder="you@example.com" /></div>
-      <div class="field"><label>Password</label><input id="su-pass" type="password" placeholder="••••••••" /></div>
-      <button class="btn" onclick="doSignup()">Create Account →</button>
+      <div id="signup-step-email">
+        <div class="field"><label>Email</label><input id="su-email" type="email" placeholder="you@example.com" onkeydown="if(event.key==='Enter')requestSignupOtp()" /></div>
+        <div class="field"><label>Password</label><input id="su-pass" type="password" placeholder="••••••••" onkeydown="if(event.key==='Enter')requestSignupOtp()" /></div>
+        <button class="btn" onclick="requestSignupOtp()">Send Verification Code →</button>
+      </div>
+      <div id="signup-step-code" style="display:none">
+        <div class="field"><label>6-Digit Code</label><input id="su-code" type="text" inputmode="numeric" maxlength="6" placeholder="123456" onkeydown="if(event.key==='Enter')verifySignupOtp()" /></div>
+        <button class="btn" onclick="verifySignupOtp()">Verify &amp; Create Account →</button>
+        <div style="text-align:center;margin-top:10px"><a href="#" style="font-size:12px;color:var(--text-muted)" onclick="showSignupStep('email');return false">← Back</a></div>
+      </div>
+    </div>
+    <div id="otp-form" style="display:none">
+      <div class="field"><label>Email</label><input id="otp-email" type="email" placeholder="you@example.com" /></div>
+      <button class="btn" onclick="requestOtp()">Send Code →</button>
+      <div class="field" style="margin-top:16px"><label>6-Digit Code</label><input id="otp-code" type="text" inputmode="numeric" maxlength="6" placeholder="123456" onkeydown="if(event.key==='Enter')verifyOtp()" /></div>
+      <button class="btn" onclick="verifyOtp()">Verify &amp; Login →</button>
     </div>
     <div class="auth-msg" id="auth-msg"></div>
   </div>
@@ -188,12 +202,11 @@
   <div class="topbar">
     <div class="topbar-logo">Task<span>Flow</span></div>
     <div class="topbar-sep"></div>
-    <div class="topbar-user">Logged in as <strong id="topbar-username"></strong></div>
+    <div class="topbar-user">Logged in as <strong id="topbar-email"></strong></div>
     <div class="topbar-spacer"></div>
     <button class="topbar-btn bell" id="invite-bell" onclick="openInvitesPanel()" style="display:none">🔔 Invites</button>
     <button class="topbar-btn" onclick="openCanvasModal()">🎓 Canvas</button>
     <button class="topbar-btn" id="topbar-canvas-sync" onclick="syncCanvasAssignments()">↻ Sync Canvas</button>
-    <button class="topbar-btn" onclick="openProfileModal()">👤 Profile</button>
     <button class="topbar-btn" onclick="doLogout()">↩ Logout</button>
   </div>
   <div class="app-body">
@@ -277,20 +290,6 @@
   </div>
 </div>
 
-<!-- PROFILE MODAL -->
-<div class="modal-overlay" id="profile-modal">
-  <div class="modal">
-    <h2>👤 My Profile</h2>
-    <div class="field"><label>Username</label><input id="profile-username" type="text" disabled style="opacity:0.5;cursor:not-allowed" /></div>
-    <div class="field"><label>Email</label><input id="profile-email" type="email" placeholder="new@email.com" /></div>
-    <div style="font-size:11px;color:var(--text-muted);margin-bottom:14px">Username cannot be changed.</div>
-    <div class="modal-actions">
-      <button class="modal-cancel" onclick="document.getElementById('profile-modal').classList.remove('open')">Cancel</button>
-      <button class="modal-save" onclick="saveProfile()">Save Changes</button>
-    </div>
-  </div>
-</div>
-
 <div id="toast"></div>
 
 <script>
@@ -316,36 +315,90 @@
 
   // ===== AUTH =====
   function switchTab(tab) {
-    document.querySelectorAll('.auth-tab').forEach((t,i) => t.classList.toggle('active', (i===0)===(tab==='login')));
+    const tabs = ['login','signup','otp'];
+    document.querySelectorAll('.auth-tab').forEach((t,i) => t.classList.toggle('active', tabs[i]===tab));
     document.getElementById('login-form').style.display   = tab==='login'   ? '' : 'none';
     document.getElementById('signup-form').style.display  = tab==='signup'  ? '' : 'none';
+    document.getElementById('otp-form').style.display     = tab==='otp'     ? '' : 'none';
+    if (tab==='signup') showSignupStep('email');
     setMsg('');
   }
+  function showSignupStep(step) {
+    document.getElementById('signup-step-email').style.display = step==='email' ? '' : 'none';
+    document.getElementById('signup-step-code').style.display  = step==='code'  ? '' : 'none';
+  }
   async function doLogin() {
-    const username = document.getElementById('login-user').value.trim();
+    const email    = document.getElementById('login-user').value.trim();
     const password = document.getElementById('login-pass').value;
-    if (!username || !password) return setMsg('Fill all fields', true);
+    if (!email || !password) return setMsg('Fill all fields', true);
     try {
-      const res  = await fetch(`${API}/api/auth/login`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({username,password}) });
+      const res  = await fetch(`${API}/api/auth/login`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({email,password}) });
       const data = await res.json();
-      if (!res.ok) return setMsg(data.error || 'Login failed', true);
-      token = data.token; currentUser = username;
+      if (!res.ok) {
+        // No account with this email — send the user straight to signup instead of a dead end.
+        if (data.code === 'EMAIL_NOT_FOUND') {
+          switchTab('signup');
+          document.getElementById('su-email').value = email;
+          setMsg('No account with that email yet — sign up below.', true);
+          return;
+        }
+        return setMsg(data.error || 'Login failed', true);
+      }
+      token = data.token; currentUser = email;
       localStorage.setItem('tf_token', token);
-      localStorage.setItem('tf_user',  username);
+      localStorage.setItem('tf_user',  email);
       showApp();
     } catch(e) { setMsg('Cannot reach server. Is Spring Boot running on port 8081?', true); }
   }
-  async function doSignup() {
-    const username = document.getElementById('su-user').value.trim();
+  async function requestSignupOtp() {
     const email    = document.getElementById('su-email').value.trim();
     const password = document.getElementById('su-pass').value;
-    if (!username || !email || !password) return setMsg('Fill all fields', true);
+    if (!email || !password) return setMsg('Fill all fields', true);
     try {
-      const res  = await fetch(`${API}/api/auth/signup`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({username,password,email}) });
-      const text = await res.text();
-      if (text.startsWith('ERROR')) return setMsg(text, true);
-      setMsg('Account created! Please login.', false);
-      switchTab('login');
+      const res  = await fetch(`${API}/api/auth/signup/request`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({email}) });
+      const data = await res.json();
+      if (!res.ok) return setMsg(data.error || 'Could not send code', true);
+      showSignupStep('code');
+      setMsg('Code sent — check your email.', false);
+    } catch(e) { setMsg('Cannot reach server.', true); }
+  }
+  async function verifySignupOtp() {
+    const email    = document.getElementById('su-email').value.trim();
+    const password = document.getElementById('su-pass').value;
+    const code     = document.getElementById('su-code').value.trim();
+    if (!email || !password || !code) return setMsg('Enter the code sent to your email', true);
+    try {
+      const res  = await fetch(`${API}/api/auth/signup/verify`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({email,password,code}) });
+      const data = await res.json();
+      if (!res.ok) return setMsg(data.error || 'Invalid code', true);
+      token = data.token; currentUser = email;
+      localStorage.setItem('tf_token', token);
+      localStorage.setItem('tf_user',  email);
+      showApp();
+    } catch(e) { setMsg('Cannot reach server.', true); }
+  }
+  async function requestOtp() {
+    const email = document.getElementById('otp-email').value.trim();
+    if (!email) return setMsg('Enter your email', true);
+    try {
+      const res  = await fetch(`${API}/api/auth/otp/request`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({email}) });
+      const data = await res.json();
+      if (!res.ok) return setMsg(data.error || 'Could not send code', true);
+      setMsg('Code sent — check your email.', false);
+    } catch(e) { setMsg('Cannot reach server.', true); }
+  }
+  async function verifyOtp() {
+    const email = document.getElementById('otp-email').value.trim();
+    const code  = document.getElementById('otp-code').value.trim();
+    if (!email || !code) return setMsg('Enter your email and the code', true);
+    try {
+      const res  = await fetch(`${API}/api/auth/otp/verify`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({email,code}) });
+      const data = await res.json();
+      if (!res.ok) return setMsg(data.error || 'Invalid code', true);
+      token = data.token; currentUser = email;
+      localStorage.setItem('tf_token', token);
+      localStorage.setItem('tf_user',  email);
+      showApp();
     } catch(e) { setMsg('Cannot reach server.', true); }
   }
   function doLogout() {
@@ -379,7 +432,7 @@
     // A modal left open would otherwise reappear over the next account's board.
     document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('open'));
     // Do not leave the last person's credentials sitting in the login form.
-    ['login-user','login-pass','su-user','su-email','su-pass'].forEach(id => {
+    ['login-user','login-pass','su-email','su-pass','su-code','otp-email','otp-code'].forEach(id => {
       const field = document.getElementById(id);
       if (field) field.value = '';
     });
@@ -396,7 +449,7 @@
     clearSession();
     document.getElementById('auth-screen').style.display = 'none';
     document.getElementById('app-screen').style.display  = 'flex';
-    document.getElementById('topbar-username').textContent = currentUser;
+    document.getElementById('topbar-email').textContent = currentUser;
     loadLists(); loadGroups(); checkInvites();
   }
 
@@ -603,6 +656,7 @@
     <div class="board-header">
       ${breadcrumb}
       <div class="board-title">${esc(listName)}</div>
+      <button class="action-btn" id="btn-sort-due">↓ Sort by Due Date</button>
     </div>
     <div class="kanban" id="kanban"></div>
   `;
@@ -610,6 +664,7 @@
       document.getElementById('board-breadcrumb')
               .addEventListener('click', () => openGroupDashboard(breadcrumbInfo.groupId, breadcrumbInfo.groupName));
     }
+    document.getElementById('btn-sort-due').addEventListener('click', sortCurrentBoardByDueDate);
     const kanban = document.getElementById('kanban');
     cols.forEach(col => {
       const its = items.filter(i => i.status === col.status);
@@ -763,6 +818,19 @@
     } catch(e) { toast('Failed to update', true); }
   }
 
+  // Calls the backend's sorted endpoint (due date ascending, no-due-date last) for whichever
+  // list is currently on screen, personal or shared, and redraws the board with that order.
+  async function sortCurrentBoardByDueDate() {
+    const listId = isGroupBoard ? currentGroupListId : currentListId;
+    if (!listId) return;
+    try {
+      const res = await authFetch(`/api/todo/${currentUser}/${listId}/sorted`);
+      if (!res.ok) throw new Error(await errorMessage(res, 'Failed to sort'));
+      items = await res.json();
+      renderBoard(currentBoardName, isGroupBoard ? { groupId: currentGroupId, groupName: (groups.find(g => g.groupId===currentGroupId)||{}).groupName || '' } : null);
+    } catch(e) { toast(e.message || 'Failed to sort', true); }
+  }
+
   async function reloadPersonalItems() {
     const lst = lists.find(l => l.todoListId === currentListId);
     await loadPersonalItems(currentListId, lst ? lst.todolistname : '');
@@ -770,10 +838,10 @@
 
   // ===== INVITE =====
   async function inviteToGroup(groupId) {
-    const username = prompt('Enter username to invite:');
-    if (!username) return;
+    const email = prompt('Enter email to invite:');
+    if (!email) return;
     try {
-      const res  = await authFetch(`/api/groups/${groupId}/invite?username=${encodeURIComponent(username)}`, { method:'POST' });
+      const res  = await authFetch(`/api/groups/${groupId}/invite?email=${encodeURIComponent(email)}`, { method:'POST' });
       const text = await res.text();
       toast(res.ok ? text : 'Failed: ' + text, !res.ok);
     } catch(e) { toast('Failed to invite', true); }
@@ -799,7 +867,7 @@
               : invites.map(inv => `
           <div class="invite-card">
             <div class="invite-card-title">👥 ${esc(inv.group.groupName)}</div>
-            <div class="invite-card-sub">Invited by ${esc(inv.group.owner.username)}</div>
+            <div class="invite-card-sub">Invited by ${esc(inv.group.owner.email)}</div>
             <div class="invite-btns">
               <button class="invite-accept"  onclick="respondInvite(${inv.inviteId},true)">✓ Accept</button>
               <button class="invite-decline" onclick="respondInvite(${inv.inviteId},false)">✕ Decline</button>
@@ -822,28 +890,6 @@
     document.getElementById('board-area').innerHTML = `<div class="board-empty"><div class="board-empty-icon">📋</div><p>Select or create a list to get started</p></div>`;
   }
 
-  // ===== PROFILE =====
-  function openProfileModal() {
-    document.getElementById('profile-username').value = currentUser;
-    document.getElementById('profile-email').value = '';
-    document.getElementById('profile-modal').classList.add('open');
-  }
-
-  async function saveProfile() {
-    const email = document.getElementById('profile-email').value.trim();
-    if (!email) { toast('Email cannot be empty', true); return; }
-    try {
-      const res = await authFetch(`/api/user/${currentUser}?email=${encodeURIComponent(email)}`, { method:'PUT' });
-      if (res.ok) {
-        toast('Profile updated!');
-        document.getElementById('profile-modal').classList.remove('open');
-      } else {
-        const text = await res.text();
-        toast('Failed: ' + text, true);
-      }
-    } catch(e) { toast('Failed to update profile', true); }
-  }
-
   // ===== TOAST =====
   let toastTimer;
   function toast(msg, isErr=false) {
@@ -856,7 +902,6 @@
 
   document.getElementById('edit-modal').addEventListener('click',    function(e){ if(e.target===this) closeModal(); });
   document.getElementById('invites-modal').addEventListener('click', function(e){ if(e.target===this) this.classList.remove('open'); });
-  document.getElementById('profile-modal').addEventListener('click', function(e){ if(e.target===this) this.classList.remove('open'); });
   document.getElementById('canvas-modal').addEventListener('click',  function(e){ if(e.target===this) this.classList.remove('open'); });
 
   // ===== CANVAS =====

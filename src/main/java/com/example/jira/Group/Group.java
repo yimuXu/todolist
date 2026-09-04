@@ -20,7 +20,7 @@ public class Group {
     @ManyToMany(fetch = FetchType.EAGER)
     @JoinTable(name = "group_members",
             joinColumns = @JoinColumn(name = "group_id"),
-            inverseJoinColumns = @JoinColumn(name = "username"))
+            inverseJoinColumns = @JoinColumn(name = "email"))
     private final List<User> members = new ArrayList<>();
 
     @OneToMany(mappedBy = "group", fetch = FetchType.EAGER)

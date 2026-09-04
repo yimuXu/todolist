@@ -52,19 +52,19 @@ public class GroupService {
         return all;
     }
 
-    public String inviteUser(int groupId, String username) {
+    public String inviteUser(int groupId, String email) {
         User currentUser = userService.getCurrentUser();
         Group group = groupRepository.findById(groupId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
-        if (!group.getOwner().getUsername().equals(currentUser.getUsername())) {
+        if (!group.getOwner().getEmail().equals(currentUser.getEmail())) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You are not the owner of this group");
         }
-        User invitee = userRepository.findByUsername(username)
+        User invitee = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
         if (groupInviteRepository.existsByGroupAndInviteeAndStatus(group, invitee, InviteStatus.PENDING)) {
             return "Please do not invite repeatedly.";
         }
         groupInviteRepository.save(new GroupInvite(group, invitee));
-        return "Invite sent to " + username;
+        return "Invite sent to " + email;
     }
 
     //get my invites
@@ -88,14 +88,14 @@ public class GroupService {
     public String respondInvite(int inviteId, boolean accept) {
         User currentUser = userService.getCurrentUser();
         GroupInvite invite = groupInviteRepository.findById(inviteId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
-        if(!invite.getInvitee().getUsername().equals(currentUser.getUsername())){
+        if(!invite.getInvitee().getEmail().equals(currentUser.getEmail())){
             throw new ResponseStatusException(HttpStatus.FORBIDDEN);
 
         }
         if(accept){
             invite.setStatus(InviteStatus.ACCEPTED);
             List<User> members = invite.getGroup().getMembers();
-            if (members.stream().noneMatch(m -> m.getUsername().equals(currentUser.getUsername()))) {
+            if (members.stream().noneMatch(m -> m.getEmail().equals(currentUser.getEmail()))) {
                 members.add(currentUser);
             }
             groupRepository.save(invite.getGroup());
@@ -122,17 +122,17 @@ public class GroupService {
         if (isOwner(groupId)){
             groupRepository.delete(group);
         } else {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN,""+userService.getCurrentUser().getUsername()+" is not the owner of this group");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,""+userService.getCurrentUser().getEmail()+" is not the owner of this group");
         }
     }
 
-    public void deleteGroupMember(int groupId,String username){
+    public void deleteGroupMember(int groupId,String email){
         // Used to silently do nothing for a non-owner, which looked like success in the UI.
         if(!isOwner(groupId)){
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You are not the owner of this group");
         }
         Group group = groupRepository.findById(groupId).orElseThrow(()-> new ResponseStatusException(HttpStatus.NOT_FOUND));
-        group.getMembers().removeIf(member -> member.getUsername().equals(username));
+        group.getMembers().removeIf(member -> member.getEmail().equals(email));
         groupRepository.save(group);
     }
 
@@ -211,15 +211,15 @@ public class GroupService {
     private boolean isOwner(int groupId) {
         User currentUser = userService.getCurrentUser();
         Group group = groupRepository.findById(groupId).orElseThrow(()-> new ResponseStatusException(HttpStatus.NOT_FOUND));
-        return group.getOwner().getUsername().equals(currentUser.getUsername());
+        return group.getOwner().getEmail().equals(currentUser.getEmail());
     }
 
     private Group checkUserPermission(int groupId) {
         User currentUser = userService.getCurrentUser();
         Group group = groupRepository.findById(groupId).orElseThrow(()-> new ResponseStatusException(HttpStatus.NOT_FOUND));
-        boolean isMember = group.getMembers().stream().anyMatch(u -> u.getUsername().equals(currentUser.getUsername()));
+        boolean isMember = group.getMembers().stream().anyMatch(u -> u.getEmail().equals(currentUser.getEmail()));
         if(!isMember){
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN,""+currentUser.getUsername()+" is not a member of this group");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,""+currentUser.getEmail()+" is not a member of this group");
         }
         return group;
     }

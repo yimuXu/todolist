@@ -28,7 +28,7 @@ class TodoServiceTest {
     private final TodoService todoService =
             new TodoService(userService, todoItemRepository, todoListRepository);
 
-    private final User user = new User("dd", "hashed", "dd@example.com");
+    private final User user = new User("dd@example.com", "hashed");
     private TodoList list;
     private TodoItem item;
 
