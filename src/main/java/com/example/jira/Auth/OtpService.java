@@ -3,36 +3,46 @@ package com.example.jira.Auth;
 import com.example.jira.User.User;
 import com.example.jira.User.UserRepository;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.mail.SimpleMailMessage;
-import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestClient;
 
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
+import java.util.Map;
 import java.util.Optional;
 
+/**
+ * Sends OTP mail through Brevo's HTTPS transactional email API rather than SMTP. Several hosts
+ * (Render's free tier among them) throttle or drop outbound SMTP (port 587) as an anti-abuse
+ * measure, which left signup hanging indefinitely: the SMTP connect itself never returned. The
+ * HTTPS API uses the same outbound path as every other external call this app makes (Canvas
+ * included) and is not subject to that restriction.
+ */
 @Service
 public class OtpService {
     private static final int EXPIRY_MINUTES = 10;
+    private static final String BREVO_SEND_URL = "https://api.brevo.com/v3/smtp/email";
     private final SecureRandom random = new SecureRandom();
 
     private final EmailOtpRepository otpRepository;
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
-    private final JavaMailSender mailSender;
+    private final RestClient restClient;
     private final String mailFrom;
+    private final String brevoApiKey;
 
     public OtpService(EmailOtpRepository otpRepository, UserRepository userRepository,
-                       PasswordEncoder passwordEncoder, JwtUtil jwtUtil, JavaMailSender mailSender,
-                       @Value("${mail.from}") String mailFrom) {
+                       PasswordEncoder passwordEncoder, JwtUtil jwtUtil, RestClient.Builder restClientBuilder,
+                       @Value("${mail.from}") String mailFrom, @Value("${brevo.api-key}") String brevoApiKey) {
         this.otpRepository = otpRepository;
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtUtil = jwtUtil;
-        this.mailSender = mailSender;
+        this.restClient = restClientBuilder.build();
         this.mailFrom = mailFrom;
+        this.brevoApiKey = brevoApiKey;
     }
 
     // ------------------------------ login OTP ------------------------------
@@ -92,12 +102,19 @@ public class OtpService {
         String code = String.format("%06d", random.nextInt(1_000_000));
         otpRepository.save(new EmailOtp(email, code, LocalDateTime.now().plusMinutes(EXPIRY_MINUTES), purpose));
 
-        SimpleMailMessage message = new SimpleMailMessage();
-        message.setFrom(mailFrom);
-        message.setTo(email);
-        message.setSubject("Your TaskFlow verification code");
-        message.setText(messagePrefix + code + ". It expires in " + EXPIRY_MINUTES + " minutes.");
-        mailSender.send(message);
+        Map<String, Object> body = Map.of(
+                "sender", Map.of("email", mailFrom),
+                "to", java.util.List.of(Map.of("email", email)),
+                "subject", "Your TaskFlow verification code",
+                "textContent", messagePrefix + code + ". It expires in " + EXPIRY_MINUTES + " minutes."
+        );
+        restClient.post()
+                .uri(BREVO_SEND_URL)
+                .header("api-key", brevoApiKey)
+                .header("Content-Type", "application/json")
+                .body(body)
+                .retrieve()
+                .toBodilessEntity();
 
         return "OTP sent";
     }

@@ -30,23 +30,15 @@ jwt:
   secret: ${JWT_SECRET:jira-app-super-secret-key-must-be-at-least-32-chars}
   expiration: ${JWT_EXPIRATION:86400000}
 
-spring.mail:
-  # OTP login emails are sent through this SMTP account. Nothing here is real — set MAIL_HOST,
-  # MAIL_USERNAME and MAIL_PASSWORD (and MAIL_PORT if not 587) before OTP emails can actually send.
-  host: ${MAIL_HOST:smtp.example.com}
-  port: ${MAIL_PORT:587}
-  username: ${MAIL_USERNAME:}
-  password: ${MAIL_PASSWORD:}
-  properties:
-    mail:
-      smtp:
-        auth: true
-        starttls:
-          enable: true
-
-# The address OTP emails are sent from. Without this Spring Mail falls back to the SMTP login
-# (e.g. an @smtp-brevo.com relay address), which is not a verified sender and Gmail/Yahoo/
-# Microsoft silently drop mail from it under their current DKIM/DMARC requirements. Must be a
-# sender verified with the SMTP provider (Brevo: Settings > Senders, Domains & Dedicated IPs).
+# OTP mail goes through Brevo's HTTPS transactional API, not SMTP — several hosts (Render's
+# free tier included) throttle or block outbound SMTP as an anti-abuse measure, which left
+# signup hanging indefinitely rather than failing. HTTPS uses the same outbound path as every
+# other external call this app makes (Canvas included).
 mail:
-  from: ${MAIL_FROM:${MAIL_USERNAME:noreply@example.com}}
+  # Must be a sender verified with Brevo (Settings > Senders, Domains & Dedicated IPs > Senders)
+  # or Gmail/Yahoo/Microsoft silently drop the mail under their DKIM/DMARC requirements.
+  from: ${MAIL_FROM:noreply@example.com}
+
+brevo:
+  # Settings > SMTP & API > API Keys in the Brevo dashboard. Different from the SMTP login/key.
+  api-key: ${BREVO_API_KEY:}
