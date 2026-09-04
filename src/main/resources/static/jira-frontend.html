@@ -355,7 +355,7 @@
     const password = document.getElementById('su-pass').value;
     if (!email || !password) return setMsg('Fill all fields', true);
     try {
-      const res  = await fetch(`${API}/api/auth/signup/request`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({email}) });
+      const res  = await fetch(`${API}/api/auth/signup/send-code`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({email}) });
       const data = await res.json();
       if (!res.ok) return setMsg(data.error || 'Could not send code', true);
       showSignupStep('code');

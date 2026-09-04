@@ -35,7 +35,10 @@ public class AuthController {
 
     // Signup is a two-step, OTP-verified flow: request a code, then verify it together with
     // the chosen password to actually create the account. There is no direct/unverified signup.
-    @PostMapping("/signup/request")
+    // Named send-code rather than signup/request: some edge/WAF layers (observed on Render, in
+    // front of Cloudflare) silently 403 any path literally containing "signup/request" as a
+    // spam-prevention heuristic, before the request ever reaches this app.
+    @PostMapping("/signup/send-code")
     public ResponseEntity<Map<String, String>> requestSignup(@RequestBody OtpRequest request){
         String result = otpService.requestSignupOtp(request.getEmail());
         if (result.startsWith("ERROR")) {
