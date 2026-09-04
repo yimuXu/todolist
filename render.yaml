@@ -1,0 +1,8 @@
+services:
+  - type: web
+    name: taskflow
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: SERVER_PORT
+        value: 10000

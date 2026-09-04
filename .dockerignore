@@ -1,0 +1,9 @@
+target/
+data/
+src/main/.m2-cache/
+src/main/todo-sync/
+jira_repo/
+.idea/
+.git/
+*.mv.db
+*.trace.db
