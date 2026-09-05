@@ -219,7 +219,7 @@
       <div id="signup-step-email">
         <div class="field"><label>Email</label><input id="su-email" type="email" placeholder="you@example.com" onkeydown="if(event.key==='Enter')requestSignupOtp()" /></div>
         <div class="field"><label>Password</label><input id="su-pass" type="password" placeholder="••••••••" onkeydown="if(event.key==='Enter')requestSignupOtp()" /></div>
-        <button class="btn" onclick="requestSignupOtp()">Send Verification Code →</button>
+        <button class="btn" id="su-send-btn" onclick="requestSignupOtp()">Send Verification Code →</button>
       </div>
       <div id="signup-step-code" style="display:none">
         <div class="field"><label>6-Digit Code</label><input id="su-code" type="text" inputmode="numeric" maxlength="6" placeholder="123456" onkeydown="if(event.key==='Enter')verifySignupOtp()" /></div>
@@ -229,7 +229,7 @@
     </div>
     <div id="otp-form" style="display:none">
       <div class="field"><label>Email</label><input id="otp-email" type="email" placeholder="you@example.com" /></div>
-      <button class="btn" onclick="requestOtp()">Send Code →</button>
+      <button class="btn" id="otp-send-btn" onclick="requestOtp()">Send Code →</button>
       <div class="field" style="margin-top:16px"><label>6-Digit Code</label><input id="otp-code" type="text" inputmode="numeric" maxlength="6" placeholder="123456" onkeydown="if(event.key==='Enter')verifyOtp()" /></div>
       <button class="btn" onclick="verifyOtp()">Verify &amp; Login →</button>
     </div>
@@ -426,6 +426,33 @@
       showApp();
     } catch(e) { setMsg('Cannot reach server. Is Spring Boot running on port 8081?', true); }
   }
+  // Disables a "send code" button for 60s with a live countdown, so a slow-arriving email
+  // does not tempt the user into hammering the endpoint for a fresh one every few seconds.
+  const otpCooldownTimers = {};
+  function startOtpCooldown(buttonId, label) {
+    const btn = document.getElementById(buttonId);
+    if (!btn) return;
+    clearInterval(otpCooldownTimers[buttonId]);
+    let remaining = 60;
+    btn.disabled = true;
+    btn.textContent = `Resend in ${remaining}s`;
+    otpCooldownTimers[buttonId] = setInterval(() => {
+      remaining--;
+      if (remaining <= 0) {
+        clearInterval(otpCooldownTimers[buttonId]);
+        btn.disabled = false;
+        btn.textContent = label;
+      } else {
+        btn.textContent = `Resend in ${remaining}s`;
+      }
+    }, 1000);
+  }
+  function resetOtpCooldown(buttonId, label) {
+    clearInterval(otpCooldownTimers[buttonId]);
+    const btn = document.getElementById(buttonId);
+    if (btn) { btn.disabled = false; btn.textContent = label; }
+  }
+
   async function requestSignupOtp() {
     const email    = document.getElementById('su-email').value.trim();
     const password = document.getElementById('su-pass').value;
@@ -436,6 +463,8 @@
       if (!res.ok) return setMsg(data.error || 'Could not send code', true);
       showSignupStep('code');
       setMsg('Code sent — check your email.', false);
+      toast('Code sent!');
+      startOtpCooldown('su-send-btn', 'Send Verification Code →');
     } catch(e) { setMsg('Cannot reach server.', true); }
   }
   async function verifySignupOtp() {
@@ -461,6 +490,8 @@
       const data = await res.json();
       if (!res.ok) return setMsg(data.error || 'Could not send code', true);
       setMsg('Code sent — check your email.', false);
+      toast('Code sent!');
+      startOtpCooldown('otp-send-btn', 'Send Code →');
     } catch(e) { setMsg('Cannot reach server.', true); }
   }
   async function verifyOtp() {
@@ -512,6 +543,10 @@
       const field = document.getElementById(id);
       if (field) field.value = '';
     });
+    // A cooldown left running from a previous session would otherwise show a stale "Resend in
+    // Ns" on a button the next login attempt never actually rate-limited.
+    resetOtpCooldown('su-send-btn', 'Send Verification Code →');
+    resetOtpCooldown('otp-send-btn', 'Send Code →');
     setMsg('');
   }
   function setMsg(msg, isErr=false) {

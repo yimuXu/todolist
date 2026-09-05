@@ -101,7 +101,7 @@ public class OtpService {
     private String send(String email, OtpPurpose purpose, String messagePrefix) {
         String code = String.format("%06d", random.nextInt(1_000_000));
         otpRepository.save(new EmailOtp(email, code, LocalDateTime.now().plusMinutes(EXPIRY_MINUTES), purpose));
-
+        // json style mapping
         Map<String, Object> body = Map.of(
                 "sender", Map.of("email", mailFrom),
                 "to", java.util.List.of(Map.of("email", email)),
