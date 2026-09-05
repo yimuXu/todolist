@@ -14,7 +14,6 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.List;
@@ -33,14 +32,13 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 class CanvasServiceTest {
 
     private static final String API = "https://canvas.test/api/v1";
-    /** include[]=term is what makes Canvas attach the semester the sync filters on. */
+    /** include[]=term is what makes Canvas attach the term dates the sync filters on. */
     private static final String COURSES_URL =
             API + "/courses?enrollment_state=active&include[]=term&per_page=100";
-    /**
-     * Worked out at run time rather than written down, so these tests do not start failing the
-     * moment the semester rolls over.
-     */
-    private static final String CURRENT_TERM = AcademicTerm.current(LocalDate.now()).label();
+    private static final String CURRENT_TERM_NAME = "Semester 2 2026";
+    /** Far enough out that this fixture never starts "expiring" as real time passes. */
+    private static final String NOT_ENDED = "2099-01-01T00:00:00Z";
+    private static final String ALREADY_ENDED = "2019-06-30T00:00:00Z";
 
     private final UserService userService = mock(UserService.class);
     private final UserRepository userRepository = mock(UserRepository.class);
@@ -109,7 +107,7 @@ class CanvasServiceTest {
         CanvasSyncResponse response = canvasService.syncAssignments();
         canvas.verify();
 
-        assertThat(response.term()).isEqualTo(CURRENT_TERM);
+        assertThat(response.terms()).containsExactly(CURRENT_TERM_NAME);
         assertThat(response.skipped()).isEqualTo(1);
         assertThat(response.skippedCourses())
                 .containsExactly("INFO1110 - Introduction to Programming (Semester 1 2019)");
@@ -207,16 +205,18 @@ class CanvasServiceTest {
                 .andExpect(header("Authorization", "Bearer canvas-token"))
                 .andRespond(withSuccess("""
                         [{"id":1,"name":"Computer Science Project","course_code":"COMP3888_S2C_ND",
-                          "term":{"id":1,"name":"%s"}},
+                          "term":{"id":1,"name":"%s","end_at":"%s"}},
                          {"id":2,"access_restricted_by_date":true},
                          {"id":4,"name":"Introduction to Programming","course_code":"INFO1110_S1C_ND",
-                          "term":{"id":2,"name":"Semester 1 2019"}}]""".formatted(CURRENT_TERM),
+                          "term":{"id":2,"name":"Semester 1 2019","end_at":"%s"}}]"""
+                                .formatted(CURRENT_TERM_NAME, NOT_ENDED, ALREADY_ENDED),
                         MediaType.APPLICATION_JSON)
                         .header("Link", "<" + API + "/courses?page=2&per_page=100>; rel=\"next\""));
         canvas.expect(requestTo(API + "/courses?page=2&per_page=100"))
                 .andRespond(withSuccess("""
                         [{"id":3,"name":"Data Science","course_code":"DATA1001_S2C",
-                          "term":{"id":1,"name":"%s"}}]""".formatted(CURRENT_TERM),
+                          "term":{"id":1,"name":"%s","end_at":"%s"}}]"""
+                                .formatted(CURRENT_TERM_NAME, NOT_ENDED),
                         MediaType.APPLICATION_JSON));
     }
 

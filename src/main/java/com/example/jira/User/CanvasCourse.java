@@ -25,14 +25,14 @@ public record CanvasCourse(
     }
 
     /**
-     * True when this course's term is the semester running now. Canvas prints the term under
-     * every course card on the dashboard ("Semester 2 2026"), so that name is all the sync goes
-     * on. An enrolment stays "active" long after a semester ends, which is why the term has to
-     * be checked at all: without it every unit the student has ever taken comes back as a to-do
-     * list on each sync.
+     * True while this course's term has not yet ended — the current term plus any future term
+     * the student is already enrolled in, so next semester's units and their assignments show up
+     * as soon as enrolment opens rather than only once that term actually starts. An enrolment
+     * stays "active" in Canvas long after a term ends, which is why this has to be checked at
+     * all: without it every unit the student has ever taken comes back as a to-do list on sync.
      */
-    public boolean isInCurrentTerm(AcademicTerm currentTerm) {
-        return currentTerm.equals(AcademicTerm.parse(term == null ? null : term.name()));
+    public boolean isInCurrentTerm() {
+        return term != null && !term.hasEnded();
     }
 
     /** How this course's term should be described in a "skipped" message. */

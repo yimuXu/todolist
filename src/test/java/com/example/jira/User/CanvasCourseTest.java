@@ -13,7 +13,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class CanvasCourseTest {
 
-    private static final CanvasTerm S2 = new CanvasTerm(1, "Semester 2 2026");
+    private static final CanvasTerm S2 = new CanvasTerm(1, "Semester 2 2026", "2099-01-01T00:00:00Z");
 
     @Test
     void putsTheUnitCodeInFrontOfTheTitle() {

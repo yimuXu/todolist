@@ -1092,16 +1092,19 @@
       const data = await res.json();
       await loadLists();
       if (currentListId && !isGroupBoard) await reloadPersonalItems();
-      const term = data.term ? ` for ${data.term}` : '';
+      // A course can belong to any not-yet-ended term (this semester, or next semester once
+      // enrolled), so more than one term name can legitimately show up in one sync.
+      const termNames = (data.terms || []).join(', ');
+      const term = termNames ? ` for ${termNames}` : '';
       toast(`Synced ${data.courses} course(s)${term}: ${data.added} added, ${data.updated} updated.`);
       // A sync that matched nothing is the confusing case, so say which courses were left out
-      // and what term Canvas has them under rather than just reporting zero.
+      // rather than just reporting zero.
       if (data.courses === 0 && data.skipped > 0) {
         const names = (data.skippedCourses || []).join(', ');
-        setCanvasStatus(`No course is in ${data.term}. Skipped ${data.skipped}: ${names}`, true);
-        toast(`No ${data.term} courses found — ${data.skipped} course(s) are in other terms.`, true);
+        setCanvasStatus(`No enrolled course's term is still current. Skipped ${data.skipped}: ${names}`, true);
+        toast(`No current courses found — ${data.skipped} course(s) are from terms that have ended.`, true);
       } else if (data.skipped > 0) {
-        setCanvasStatus(`Skipped ${data.skipped} course(s) outside ${data.term}.`);
+        setCanvasStatus(`Skipped ${data.skipped} course(s) from terms that have ended.`);
       }
       return true;
     } catch (e) {

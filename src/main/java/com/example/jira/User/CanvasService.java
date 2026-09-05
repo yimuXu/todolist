@@ -17,7 +17,6 @@ import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.net.URI;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
@@ -120,10 +119,9 @@ public class CanvasService {
         String token = requireToken(user.getCanvasToken());
         String apiUrl = apiUrlOf(user);
 
-        // include[]=term is what makes Canvas attach the semester each course belongs to; without
-        // it every course comes back termless and finished units cannot be told from current ones.
+        // include[]=term is what makes Canvas attach each course's term dates; without it every
+        // course comes back termless and finished units cannot be told from current ones.
         List<CanvasCourse> courses = fetchAll(apiUrl, COURSES_PATH, token, COURSE_PAGE);
-        AcademicTerm currentTerm = AcademicTerm.current(LocalDate.now());
         int syncedCourses = 0;
         int skippedCourses = 0;
         int added = 0;
@@ -132,15 +130,19 @@ public class CanvasService {
         // which courses were left out and what term Canvas put them in, or an empty result just
         // looks broken. Capped so a long enrolment history cannot bloat the response.
         List<String> skippedNames = new ArrayList<>();
+        // A LinkedHashSet-backed order: usually just this semester, occasionally this semester
+        // plus next, so the response lists each matched term once in the order first seen.
+        java.util.Set<String> syncedTerms = new java.util.LinkedHashSet<>();
 
         for (CanvasCourse course : courses) {
             if (course == null || !course.isReadable()) continue;
-            if (!course.isInCurrentTerm(currentTerm)) {
+            if (!course.isInCurrentTerm()) {
                 skippedCourses++;
                 if (skippedNames.size() < MAX_REPORTED_SKIPS) skippedNames.add(course.describe());
                 continue;
             }
             syncedCourses++;
+            syncedTerms.add(course.termLabel());
             TodoList list = getOrCreateList(user, course.listName());
             backfillLegacyCanvasIds(list);
 
@@ -166,7 +168,7 @@ public class CanvasService {
             }
         }
         return new CanvasSyncResponse(syncedCourses, added, updated, skippedCourses,
-                currentTerm.label(), skippedNames);
+                new ArrayList<>(syncedTerms), skippedNames);
     }
 
     private TodoList getOrCreateList(User user, String courseName) {
