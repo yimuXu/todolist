@@ -353,6 +353,11 @@
   // Declared with the rest of the state, not further down the file: showApp() runs on page load
   // and clears it, which would hit the temporal dead zone if the declaration came later.
   let currentBoardName = '';
+  // Declared here rather than next to startOtpCooldown/resetOtpCooldown below: a valid token
+  // already in storage makes the next line call showApp() -> clearSession() -> resetOtpCooldown
+  // immediately, and a `const` used before its own declaration line throws
+  // "Cannot access before initialization" even though the function that reads it is hoisted.
+  const otpCooldownTimers = {};
 
   initTheme();
   // Collapsed by default only on a phone-width screen — on desktop the sidebar starts open.
@@ -428,7 +433,6 @@
   }
   // Disables a "send code" button for 60s with a live countdown, so a slow-arriving email
   // does not tempt the user into hammering the endpoint for a fresh one every few seconds.
-  const otpCooldownTimers = {};
   function startOtpCooldown(buttonId, label) {
     const btn = document.getElementById(buttonId);
     if (!btn) return;
