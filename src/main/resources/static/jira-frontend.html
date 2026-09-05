@@ -6,15 +6,26 @@
   <title>TaskFlow — Jira Clone</title>
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet" />
   <style>
+    /* Dark is the default look this app shipped with, so it stays the unqualified :root
+       palette; [data-theme="light"] overrides it rather than the other way around, which
+       keeps every existing color reference (var(--bg) etc.) working unchanged. */
     :root {
       --bg: #0a0a0f; --surface: #12121a; --surface2: #1a1a26; --border: #2a2a40;
       --accent: #6c63ff; --accent2: #ff6584; --accent3: #43e97b;
       --text: #e8e8f0; --text-muted: #6b6b8a; --radius: 12px;
       --shadow: 0 4px 32px rgba(0,0,0,0.5);
+      --noise-opacity: 0.04;
+    }
+    :root[data-theme="light"] {
+      --bg: #f4f4fa; --surface: #ffffff; --surface2: #eef0f8; --border: #d8dae8;
+      --accent: #5a52e0; --accent2: #e0405f; --accent3: #22a35a;
+      --text: #1a1a26; --text-muted: #6b6b8a;
+      --shadow: 0 4px 32px rgba(20,20,40,0.1);
+      --noise-opacity: 0.02;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'DM Mono', monospace; background: var(--bg); color: var(--text); min-height: 100vh; overflow-x: hidden; }
-    body::before { content: ''; position: fixed; inset: 0; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E"); pointer-events: none; z-index: 0; }
+    body { font-family: 'DM Mono', monospace; background: var(--bg); color: var(--text); min-height: 100vh; overflow-x: hidden; transition: background 0.2s, color 0.2s; }
+    body::before { content: ''; position: fixed; inset: 0; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='var(--noise-opacity)'/%3E%3C/svg%3E"); pointer-events: none; z-index: 0; }
 
     /* AUTH */
     #auth-screen { min-height: 100vh; display: flex; align-items: center; justify-content: center; position: relative; z-index: 1; }
@@ -38,7 +49,9 @@
 
     /* APP */
     #app-screen { display: none; flex-direction: column; min-height: 100vh; position: relative; z-index: 1; }
-    .topbar { display: flex; align-items: center; gap: 16px; padding: 0 28px; height: 56px; background: rgba(18,18,26,0.95); border-bottom: 1px solid var(--border); backdrop-filter: blur(12px); position: sticky; top: 0; z-index: 100; }
+    .topbar { display: flex; align-items: center; gap: 16px; padding: 0 28px; height: 56px; background: var(--surface); border-bottom: 1px solid var(--border); backdrop-filter: blur(12px); position: sticky; top: 0; z-index: 100; }
+    .sidebar-toggle { display: none; background: transparent; border: 1px solid var(--border); border-radius: 6px; color: var(--text-muted); width: 32px; height: 32px; font-size: 16px; cursor: pointer; align-items: center; justify-content: center; }
+    .sidebar-toggle:hover { border-color: var(--accent); color: var(--accent); }
     .topbar-logo { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 18px; letter-spacing: -0.5px; }
     .topbar-logo span { color: var(--accent); }
     .topbar-sep { width: 1px; height: 24px; background: var(--border); }
@@ -52,7 +65,11 @@
     .app-body { display: flex; flex: 1; min-height: 0; }
 
     /* SIDEBAR */
-    .sidebar { width: 260px; min-width: 260px; background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; padding: 20px 0; overflow-y: auto; }
+    .sidebar { width: 260px; min-width: 260px; background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; padding: 20px 0; overflow-y: auto; transition: margin-left 0.2s ease; }
+    /* Desktop collapse: slid out of view with a negative margin instead of display:none, so the
+       transition can animate it rather than snapping. */
+    .app-body.sidebar-collapsed .sidebar { margin-left: -260px; }
+    .sidebar-backdrop { display: none; }
     .sidebar-section-title { font-family: 'Syne', sans-serif; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: var(--text-muted); padding: 14px 20px 8px; }
     .sidebar-divider { height: 1px; background: var(--border); margin: 8px 16px; }
     .list-item { display: flex; align-items: center; justify-content: space-between; padding: 9px 20px; cursor: pointer; transition: background 0.15s; border-left: 3px solid transparent; }
@@ -154,6 +171,28 @@
     #toast.ok { border-color: var(--accent3); color: var(--accent3); }
     #toast.err { border-color: var(--accent2); color: var(--accent2); }
     ::-webkit-scrollbar { width: 4px; } ::-webkit-scrollbar-track { background: transparent; } ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+    /* MOBILE (≤768px): the sidebar becomes an off-canvas drawer over the board rather than a
+       column beside it — there is no room for both on a phone screen — and the kanban stacks to
+       one column so cards keep a readable width instead of being squeezed to ~110px each. */
+    @media (max-width: 768px) {
+      .auth-box { width: calc(100vw - 40px); padding: 36px 24px; }
+      .topbar { padding: 0 16px; gap: 10px; }
+      .topbar-user { display: none; }
+      .sidebar-toggle { display: flex; }
+      .board-area { padding: 16px; }
+      .kanban { grid-template-columns: 1fr; }
+
+      .sidebar {
+        position: fixed; top: 56px; bottom: 0; left: 0; z-index: 200;
+        transform: translateX(-100%); transition: transform 0.2s ease; margin-left: 0 !important;
+        box-shadow: var(--shadow);
+      }
+      .app-body:not(.sidebar-collapsed) .sidebar { transform: translateX(0); }
+      .app-body:not(.sidebar-collapsed) .sidebar-backdrop {
+        display: block; position: fixed; inset: 56px 0 0 0; background: rgba(0,0,0,0.5); z-index: 150;
+      }
+    }
   </style>
 </head>
 <body>
@@ -161,6 +200,7 @@
 <!-- AUTH -->
 <div id="auth-screen">
   <div class="auth-glow"></div>
+  <button class="topbar-btn" id="auth-theme-toggle-btn" onclick="toggleTheme()" title="Toggle light/dark" style="position:absolute;top:20px;right:20px;display:flex;align-items:center;justify-content:center;width:36px;height:36px;padding:0">🌙</button>
   <div class="auth-box">
     <div class="auth-logo">Task<span>Flow</span></div>
     <div class="auth-sub">Your minimal Jira — powered by Spring Boot</div>
@@ -200,17 +240,20 @@
 <!-- APP -->
 <div id="app-screen">
   <div class="topbar">
+    <button class="sidebar-toggle" id="sidebar-toggle-btn" onclick="toggleSidebar()" title="Toggle sidebar">☰</button>
     <div class="topbar-logo">Task<span>Flow</span></div>
     <div class="topbar-sep"></div>
     <div class="topbar-user">Logged in as <strong id="topbar-email"></strong></div>
     <div class="topbar-spacer"></div>
+    <button class="topbar-btn" id="theme-toggle-btn" onclick="toggleTheme()" title="Toggle light/dark">🌙</button>
     <button class="topbar-btn bell" id="invite-bell" onclick="openInvitesPanel()" style="display:none">🔔 Invites</button>
     <button class="topbar-btn" onclick="openCanvasModal()">🎓 Canvas</button>
     <button class="topbar-btn" id="topbar-canvas-sync" onclick="syncCanvasAssignments()">↻ Sync Canvas</button>
     <button class="topbar-btn" onclick="doLogout()">↩ Logout</button>
   </div>
-  <div class="app-body">
-    <div class="sidebar">
+  <div class="app-body" id="app-body">
+    <div class="sidebar-backdrop" onclick="toggleSidebar()"></div>
+    <div class="sidebar" id="sidebar">
       <div class="sidebar-section-title">My Lists</div>
       <div id="list-container"></div>
       <div class="sidebar-add">
@@ -311,7 +354,40 @@
   // and clears it, which would hit the temporal dead zone if the declaration came later.
   let currentBoardName = '';
 
+  initTheme();
+  // Collapsed by default only on a phone-width screen — on desktop the sidebar starts open.
+  if (window.innerWidth <= 768) document.getElementById('app-body').classList.add('sidebar-collapsed');
+
   if (token) showApp();
+
+  // ===== THEME =====
+  function initTheme() {
+    // No stored choice yet: match the OS/browser preference rather than forcing dark on
+    // everyone, since this is a plain page (not the sandboxed artifact runtime) and can read
+    // prefers-color-scheme directly.
+    let saved;
+    try { saved = localStorage.getItem('tf_theme'); } catch (e) {}
+    const theme = saved || (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+    applyTheme(theme);
+  }
+  function applyTheme(theme) {
+    document.documentElement.setAttribute('data-theme', theme);
+    const icon = theme === 'light' ? '☀️' : '🌙';
+    ['theme-toggle-btn', 'auth-theme-toggle-btn'].forEach(id => {
+      const btn = document.getElementById(id);
+      if (btn) btn.textContent = icon;
+    });
+    try { localStorage.setItem('tf_theme', theme); } catch (e) {}
+  }
+  function toggleTheme() {
+    const current = document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+    applyTheme(current === 'light' ? 'dark' : 'light');
+  }
+
+  // ===== SIDEBAR =====
+  function toggleSidebar() {
+    document.getElementById('app-body').classList.toggle('sidebar-collapsed');
+  }
 
   // ===== AUTH =====
   function switchTab(tab) {
@@ -515,6 +591,13 @@
     currentBoardName   = listName;
     renderSidebar(); renderGroupSidebar();
     loadPersonalItems(listId, listName);
+    closeSidebarOnMobile();
+  }
+
+  // On a phone the sidebar is a drawer over the board, so picking something in it should get
+  // out of the way automatically rather than leaving the user to dismiss it separately.
+  function closeSidebarOnMobile() {
+    if (window.innerWidth <= 768) document.getElementById('app-body').classList.add('sidebar-collapsed');
   }
 
   async function loadPersonalItems(listId, listName) {
@@ -564,6 +647,7 @@
     currentGroupListId = null;
     isGroupBoard       = false;
     renderSidebar(); renderGroupSidebar();
+    closeSidebarOnMobile();
     try {
       const res        = await authFetch(`/api/groups/${groupId}/lists`);
       const groupLists = await res.json();
