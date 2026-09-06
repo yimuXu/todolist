@@ -22,16 +22,18 @@ public record CanvasTerm(long id, String name, @JsonProperty("end_at") String en
     }
 
     /**
-     * True once this term's end date has passed. A null end date (an ongoing or not-yet-dated
-     * term) is treated as not yet ended, since Canvas leaves it null for terms with no fixed
-     * close, not as a way of saying "this happened a long time ago."
+     * True once this term's end date has passed, or when it has no end date at all. A missing
+     * end_at almost always means Canvas's catch-all "Default Term" — the term a course sits in
+     * when nobody assigned it a real semester — which is indefinite and would otherwise never
+     * count as "ended," syncing that course's to-do list permanently. Treating no end date as
+     * already ended means only a term with a real, dated close is kept.
      */
     public boolean hasEnded() {
-        if (endAt == null || endAt.isBlank()) return false;
+        if (endAt == null || endAt.isBlank()) return true;
         try {
             return OffsetDateTime.parse(endAt).toInstant().isBefore(Instant.now());
         } catch (DateTimeParseException exception) {
-            return false;
+            return true;
         }
     }
 }

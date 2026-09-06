@@ -132,7 +132,29 @@ public class GroupService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You are not the owner of this group");
         }
         Group group = groupRepository.findById(groupId).orElseThrow(()-> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        if (group.getOwner().getEmail().equals(email)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "The owner cannot be removed from their own group");
+        }
         group.getMembers().removeIf(member -> member.getEmail().equals(email));
+        groupRepository.save(group);
+    }
+
+    /**
+     * A member leaving of their own accord. The owner cannot use this to walk away and leave the
+     * group ownerless — they must delete the group instead, same as the existing owner-only
+     * checks elsewhere in this class assume an owner always exists.
+     */
+    public void leaveGroup(int groupId) {
+        User currentUser = userService.getCurrentUser();
+        Group group = groupRepository.findById(groupId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        if (group.getOwner().getEmail().equals(currentUser.getEmail())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "You own this group — delete it instead of leaving, or it would have no owner");
+        }
+        boolean wasMember = group.getMembers().removeIf(member -> member.getEmail().equals(currentUser.getEmail()));
+        if (!wasMember) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You are not a member of this group");
+        }
         groupRepository.save(group);
     }
 

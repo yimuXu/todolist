@@ -35,10 +35,12 @@ class CanvasCourseTermTest {
     }
 
     @Test
-    void keepsATermWithNoEndDateAtAll() {
-        // Canvas leaves end_at null for an ongoing/undated term, not to mean "long over."
-        assertFalse(term(null).hasEnded());
-        assertTrue(course(term(null)).isInCurrentTerm());
+    void dropsATermWithNoEndDateAtAll() {
+        // A missing end_at is almost always Canvas's catch-all "Default Term" — the term a
+        // course sits in when nobody assigned it a real semester — which is indefinite and
+        // would otherwise never count as "ended," syncing that course's list forever.
+        assertTrue(term(null).hasEnded());
+        assertFalse(course(term(null)).isInCurrentTerm());
     }
 
     @Test
@@ -49,8 +51,8 @@ class CanvasCourseTermTest {
     }
 
     @Test
-    void toleratesAnUnparseableEndDateBySyncingAnyway() {
-        assertFalse(term("not-a-date").hasEnded());
+    void treatsAnUnparseableEndDateAsEnded() {
+        assertTrue(term("not-a-date").hasEnded());
     }
 
     @Test

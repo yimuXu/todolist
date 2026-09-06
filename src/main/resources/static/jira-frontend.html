@@ -52,6 +52,8 @@
     .topbar { display: flex; align-items: center; gap: 16px; padding: 0 28px; height: 56px; background: var(--surface); border-bottom: 1px solid var(--border); backdrop-filter: blur(12px); position: sticky; top: 0; z-index: 100; }
     .sidebar-toggle { display: none; background: transparent; border: 1px solid var(--border); border-radius: 6px; color: var(--text-muted); width: 32px; height: 32px; font-size: 16px; cursor: pointer; align-items: center; justify-content: center; }
     .sidebar-toggle:hover { border-color: var(--accent); color: var(--accent); }
+    .topbar-actions { display: flex; align-items: center; gap: 16px; }
+    .more-toggle { display: none; width: 32px; padding: 0; font-size: 18px; }
     .topbar-logo { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 18px; letter-spacing: -0.5px; }
     .topbar-logo span { color: var(--accent); }
     .topbar-sep { width: 1px; height: 24px; background: var(--border); }
@@ -183,6 +185,18 @@
       .board-area { padding: 16px; }
       .kanban { grid-template-columns: 1fr; }
 
+      /* The four action buttons no longer fit inline, so they collapse behind a single "⋮"
+         toggle into a dropdown panel — the standard mobile pattern for a crowded toolbar. */
+      .more-toggle { display: flex; align-items: center; justify-content: center; }
+      .topbar-actions {
+        display: none; position: absolute; top: 56px; right: 16px; z-index: 110;
+        flex-direction: column; align-items: stretch; gap: 0; background: var(--surface);
+        border: 1px solid var(--border); border-radius: 10px; box-shadow: var(--shadow);
+        padding: 6px; min-width: 180px;
+      }
+      .topbar-actions.open { display: flex; }
+      .topbar-actions .topbar-btn { justify-content: flex-start; border: none; padding: 10px 12px; }
+
       .sidebar {
         position: fixed; top: 56px; bottom: 0; left: 0; z-index: 200;
         transform: translateX(-100%); transition: transform 0.2s ease; margin-left: 0 !important;
@@ -246,10 +260,13 @@
     <div class="topbar-user">Logged in as <strong id="topbar-email"></strong></div>
     <div class="topbar-spacer"></div>
     <button class="topbar-btn" id="theme-toggle-btn" onclick="toggleTheme()" title="Toggle light/dark">🌙</button>
-    <button class="topbar-btn bell" id="invite-bell" onclick="openInvitesPanel()" style="display:none">🔔 Invites</button>
-    <button class="topbar-btn" onclick="openCanvasModal()">🎓 Canvas</button>
-    <button class="topbar-btn" id="topbar-canvas-sync" onclick="syncCanvasAssignments()">↻ Sync Canvas</button>
-    <button class="topbar-btn" onclick="doLogout()">↩ Logout</button>
+    <div class="topbar-actions" id="topbar-actions">
+      <button class="topbar-btn bell" id="invite-bell" onclick="openInvitesPanel()" style="display:none">🔔 Invites</button>
+      <button class="topbar-btn" onclick="openCanvasModal()">🎓 Canvas</button>
+      <button class="topbar-btn" id="topbar-canvas-sync" onclick="syncCanvasAssignments()">↻ Sync Canvas</button>
+      <button class="topbar-btn" onclick="doLogout()">↩ Logout</button>
+    </div>
+    <button class="topbar-btn more-toggle" id="more-toggle-btn" onclick="toggleMoreActions()" title="More actions">⋮</button>
   </div>
   <div class="app-body" id="app-body">
     <div class="sidebar-backdrop" onclick="toggleSidebar()"></div>
@@ -307,6 +324,17 @@
   </div>
 </div>
 
+<!-- GROUP MEMBERS MODAL -->
+<div class="modal-overlay" id="members-modal">
+  <div class="modal">
+    <h2 id="members-title">👥 Members</h2>
+    <div id="members-list"></div>
+    <div class="modal-actions" style="margin-top:16px">
+      <button class="modal-cancel" onclick="document.getElementById('members-modal').classList.remove('open')">Close</button>
+    </div>
+  </div>
+</div>
+
 <!-- CANVAS SETTINGS MODAL -->
 <div class="modal-overlay" id="canvas-modal">
   <div class="modal">
@@ -353,15 +381,29 @@
   // Declared with the rest of the state, not further down the file: showApp() runs on page load
   // and clears it, which would hit the temporal dead zone if the declaration came later.
   let currentBoardName = '';
-  // Declared here rather than next to startOtpCooldown/resetOtpCooldown below: a valid token
-  // already in storage makes the next line call showApp() -> clearSession() -> resetOtpCooldown
-  // immediately, and a `const` used before its own declaration line throws
-  // "Cannot access before initialization" even though the function that reads it is hoisted.
+  // Declared here rather than next to the functions that use them, further down the file: a
+  // valid token already in storage makes the next line call showApp() -> clearSession(), which
+  // reads both of these immediately — and a variable used before its own declaration line
+  // throws "Cannot access before initialization" even though the function reading it is hoisted.
   const otpCooldownTimers = {};
+  let groupPollTimer = null;
 
   initTheme();
   // Collapsed by default only on a phone-width screen — on desktop the sidebar starts open.
-  if (window.innerWidth <= 768) document.getElementById('app-body').classList.add('sidebar-collapsed');
+  const MOBILE_BREAKPOINT = 768;
+  let wasMobileWidth = window.innerWidth <= MOBILE_BREAKPOINT;
+  if (wasMobileWidth) document.getElementById('app-body').classList.add('sidebar-collapsed');
+
+  // Resizing the window (or rotating a device) across the breakpoint reopens the sidebar going
+  // into desktop width and re-hides it going into phone width, rather than leaving it stuck
+  // wherever it happened to be — the phone drawer and the desktop collapse share the same class,
+  // but crossing the breakpoint should reset it, not carry the other layout's state along.
+  window.addEventListener('resize', function() {
+    const isMobileWidth = window.innerWidth <= MOBILE_BREAKPOINT;
+    if (isMobileWidth === wasMobileWidth) return;
+    wasMobileWidth = isMobileWidth;
+    document.getElementById('app-body').classList.toggle('sidebar-collapsed', isMobileWidth);
+  });
 
   if (token) showApp();
 
@@ -393,6 +435,20 @@
   function toggleSidebar() {
     document.getElementById('app-body').classList.toggle('sidebar-collapsed');
   }
+
+  // ===== TOPBAR MORE-ACTIONS (mobile) =====
+  function toggleMoreActions() {
+    document.getElementById('topbar-actions').classList.toggle('open');
+  }
+  // Closes the dropdown on an outside click/tap — without this it only ever closed by toggling
+  // the ⋮ button again, which is not how any other menu on the page behaves.
+  document.addEventListener('click', function(e) {
+    const panel = document.getElementById('topbar-actions');
+    const toggle = document.getElementById('more-toggle-btn');
+    if (panel.classList.contains('open') && !panel.contains(e.target) && e.target !== toggle) {
+      panel.classList.remove('open');
+    }
+  });
 
   // ===== AUTH =====
   function switchTab(tab) {
@@ -533,6 +589,7 @@
     lists = []; groups = []; items = [];
     currentListId = null; currentGroupId = null; currentGroupListId = null;
     editingItemId = null; showingAddForm = {}; isGroupBoard = false; currentBoardName = '';
+    stopGroupPolling();
 
     document.getElementById('list-container').innerHTML = '';
     document.getElementById('group-container').innerHTML = '';
@@ -628,6 +685,7 @@
     isGroupBoard       = false;
     showingAddForm     = {};
     currentBoardName   = listName;
+    stopGroupPolling();
     renderSidebar(); renderGroupSidebar();
     loadPersonalItems(listId, listName);
     closeSidebarOnMobile();
@@ -685,6 +743,7 @@
     currentListId      = null;
     currentGroupListId = null;
     isGroupBoard       = false;
+    stopGroupPolling();
     renderSidebar(); renderGroupSidebar();
     closeSidebarOnMobile();
     try {
@@ -699,12 +758,14 @@
     area.innerHTML = `
     <div class="board-header">
       <div class="board-title">👥 ${esc(groupName)}</div>
+      <button class="action-btn" id="btn-view-members">👤 Members</button>
       <button class="action-btn green" id="btn-invite-group">+ Invite User</button>
       <button class="action-btn" id="btn-new-group-list">+ New Shared List</button>
     </div>
     <div class="group-lists-grid" id="group-lists-grid"></div>
   `;
     // Use addEventListener to avoid quote-escaping issues in onclick (fix bug 1)
+    document.getElementById('btn-view-members').addEventListener('click', () => openMembersModal(groupId, groupName));
     document.getElementById('btn-invite-group').addEventListener('click', () => inviteToGroup(groupId));
     document.getElementById('btn-new-group-list').addEventListener('click', () => createGroupListPrompt(groupId, groupName));
 
@@ -746,6 +807,7 @@
     items              = preloadedItems;
     renderSidebar(); renderGroupSidebar();
     renderBoard(listName, { groupId, groupName });
+    startGroupPolling();
   }
 
   // Reload items for group list — fetch fresh from group endpoint
@@ -758,6 +820,25 @@
       const g = groups.find(g => g.groupId === currentGroupId);
       renderBoard(currentBoardName, { groupId: currentGroupId, groupName: g ? g.groupName : '' });
     } catch(e) { toast('Failed to reload', true); }
+  }
+
+  // ===== SHARED LIST POLLING =====
+  // A shared list has no push/websocket updates, so without this a teammate's change (an item
+  // they added, moved or deleted) only ever appears once you leave the board and come back, or
+  // touch something yourself and trigger the app's own post-action reload. Polling only while a
+  // group board is actually on screen, and skipping a tick whenever the user has something open
+  // that a re-render would blow away — an add-item form's typed text lives only in the DOM, not
+  // in JS state, and the edit modal would otherwise get silently reset out from under them.
+  function startGroupPolling() {
+    stopGroupPolling();
+    groupPollTimer = setInterval(() => {
+      if (!isGroupBoard || editingItemId !== null) return;
+      if (Object.values(showingAddForm).some(Boolean)) return;
+      reloadGroupItems();
+    }, 7000);
+  }
+  function stopGroupPolling() {
+    if (groupPollTimer) { clearInterval(groupPollTimer); groupPollTimer = null; }
   }
 
   // ===== KANBAN BOARD =====
@@ -970,6 +1051,62 @@
     } catch(e) { toast('Failed to invite', true); }
   }
 
+  // ===== MEMBERS =====
+  // /api/groups/mine already carries each group's owner and full member list, so the modal is
+  // built from that cached data rather than a separate fetch — it is refreshed whenever the
+  // group list on the sidebar is (loadGroups()), which is more than enough for a panel the user
+  // opens on demand rather than leaves open continuously.
+  function openMembersModal(groupId, groupName) {
+    const group = groups.find(g => g.groupId === groupId);
+    if (!group) return toast('Group not found', true);
+    const isOwner = group.owner && group.owner.email === currentUser;
+
+    document.getElementById('members-title').textContent = `👤 Members — ${group.groupName}`;
+    const list = document.getElementById('members-list');
+    list.innerHTML = (group.members || []).map(member => {
+      const memberIsOwner = group.owner && member.email === group.owner.email;
+      const isSelf = member.email === currentUser;
+      let action = '';
+      if (memberIsOwner) {
+        action = '<span style="font-size:11px;color:var(--accent3)">Owner</span>';
+      } else if (isOwner) {
+        action = `<button class="card-btn del" onclick="kickMember(${groupId}, '${esc(member.email)}', '${esc(groupName)}')">Kick</button>`;
+      } else if (isSelf) {
+        action = `<button class="card-btn del" onclick="leaveGroupConfirm(${groupId})">Leave</button>`;
+      }
+      return `
+        <div class="invite-card" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+          <span style="font-size:13px">${esc(member.email)}${isSelf ? ' (you)' : ''}</span>
+          ${action}
+        </div>`;
+    }).join('') || '<p style="color:var(--text-muted);font-size:13px">No members.</p>';
+
+    document.getElementById('members-modal').classList.add('open');
+  }
+
+  async function kickMember(groupId, email, groupName) {
+    if (!confirm(`Remove ${email} from this group?`)) return;
+    try {
+      const res = await authFetch(`/api/groups/${groupId}/deletemember?email=${encodeURIComponent(email)}`, { method:'DELETE' });
+      if (!res.ok) throw new Error(await errorMessage(res, 'Failed to remove member'));
+      toast('Member removed');
+      await loadGroups();
+      openMembersModal(groupId, groupName);
+    } catch(e) { toast(e.message || 'Failed to remove member', true); }
+  }
+
+  async function leaveGroupConfirm(groupId) {
+    if (!confirm('Leave this group? You will lose access to its shared lists.')) return;
+    try {
+      const res = await authFetch(`/api/groups/${groupId}/leave`, { method:'POST' });
+      if (!res.ok) throw new Error(await errorMessage(res, 'Failed to leave group'));
+      toast('Left the group');
+      document.getElementById('members-modal').classList.remove('open');
+      if (currentGroupId === groupId) { currentGroupId = null; renderEmptyBoard(); }
+      await loadGroups();
+    } catch(e) { toast(e.message || 'Failed to leave group', true); }
+  }
+
   async function checkInvites() {
     try {
       const res     = await authFetch('/api/groups/invites/received');
@@ -1026,6 +1163,7 @@
   document.getElementById('edit-modal').addEventListener('click',    function(e){ if(e.target===this) closeModal(); });
   document.getElementById('invites-modal').addEventListener('click', function(e){ if(e.target===this) this.classList.remove('open'); });
   document.getElementById('canvas-modal').addEventListener('click',  function(e){ if(e.target===this) this.classList.remove('open'); });
+  document.getElementById('members-modal').addEventListener('click', function(e){ if(e.target===this) this.classList.remove('open'); });
 
   // ===== CANVAS =====
   // Reads the error text Spring puts in the problem body, so the user sees the real reason

@@ -98,4 +98,9 @@ public class GroupController {
     public void deleteGroupMember(@PathVariable int groupId, @RequestParam String email) {
         groupService.deleteGroupMember(groupId, email);
     }
+
+    @PostMapping("/{groupId}/leave")
+    public void leaveGroup(@PathVariable int groupId) {
+        groupService.leaveGroup(groupId);
+    }
 }

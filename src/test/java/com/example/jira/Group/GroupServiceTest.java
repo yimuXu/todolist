@@ -167,4 +167,54 @@ class GroupServiceTest {
 
         assertEquals("Please do not invite repeatedly.", groupService.inviteUser(3, "mallory@example.com"));
     }
+
+    @Test
+    void aMemberCanLeaveTheGroupTheyDidNotCreate() {
+        groupService.leaveGroup(3);
+
+        assertTrue(group.getMembers().stream().noneMatch(m -> m.getEmail().equals("bob@example.com")));
+        verify(groupRepository).save(group);
+    }
+
+    @Test
+    void theOwnerCannotLeaveTheirOwnGroup() {
+        when(userService.getCurrentUser()).thenReturn(alice);
+
+        ResponseStatusException thrown = assertThrows(ResponseStatusException.class,
+                () -> groupService.leaveGroup(3));
+        assertEquals(HttpStatus.BAD_REQUEST, thrown.getStatusCode());
+        assertTrue(group.getMembers().stream().anyMatch(m -> m.getEmail().equals("alice@example.com")));
+    }
+
+    @Test
+    void someoneNotInTheGroupCannotLeaveIt() {
+        when(userService.getCurrentUser()).thenReturn(mallory);
+
+        assertThrows(ResponseStatusException.class, () -> groupService.leaveGroup(3));
+    }
+
+    @Test
+    void theOwnerCanKickAMember() {
+        when(userService.getCurrentUser()).thenReturn(alice);
+
+        groupService.deleteGroupMember(3, "bob@example.com");
+
+        assertTrue(group.getMembers().stream().noneMatch(m -> m.getEmail().equals("bob@example.com")));
+    }
+
+    @Test
+    void theOwnerCannotKickThemself() {
+        when(userService.getCurrentUser()).thenReturn(alice);
+
+        ResponseStatusException thrown = assertThrows(ResponseStatusException.class,
+                () -> groupService.deleteGroupMember(3, "alice@example.com"));
+        assertEquals(HttpStatus.BAD_REQUEST, thrown.getStatusCode());
+    }
+
+    @Test
+    void aNonOwnerCannotKickAnyone() {
+        ResponseStatusException thrown = assertThrows(ResponseStatusException.class,
+                () -> groupService.deleteGroupMember(3, "alice@example.com"));
+        assertEquals(HttpStatus.FORBIDDEN, thrown.getStatusCode());
+    }
 }
